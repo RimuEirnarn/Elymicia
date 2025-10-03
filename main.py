@@ -6,29 +6,47 @@ import curses
 from os import getcwd
 from os.path import basename
 from curses import window
-from lymia import Forms, HorizontalMenu, Menu, Panel, Scene, on_key, run
+from lymia import HorizontalMenu, Menu, Panel, Scene, on_key, run
 from lymia.data import ReturnType
 from lymia.environment import Theme, Coloring
 from lymia.colors import ColorPair, color
 
 from props.ui.tabs import TabState, draw_tab
-from props.utils import Directory
+from props.utils import Directory, FormatColor, DEFAULT as FMT_DFT
 
 
 class Basic(Coloring):
     """Basic"""
 
     SELECTED = ColorPair(color.BLACK, color.YELLOW)
-    DIRECTORY = ColorPair(color.GREEN, 0)
-    SYMLINK = ColorPair(color.BLUE, 0)
+    DIRECTORY = ColorPair(color.BLUE, 0)
+    SYMLINK = ColorPair(color.CYAN, 0)
+    DEVICE = ColorPair(color.YELLOW, 0)
+    SOCK = ColorPair(color.GREEN, 0)
+    BLOCK = ColorPair(color.YELLOW, 0)
+
+basic = Basic()
+
+fmt: FormatColor = {
+    'reg': FMT_DFT,
+    "block": ("", int(Basic.BLOCK)),
+    "char": ("", int(Basic.DEVICE)),
+    "directory": ("/", int(Basic.DIRECTORY)),
+    "door": FMT_DFT,
+    "fifo": FMT_DFT,
+    "link": ('@', int(Basic.SYMLINK)),
+    "port": FMT_DFT,
+    "sock": ("", int(Basic.SOCK)),
+    "whiteout": FMT_DFT
+} # type: ignore
 
 
 def generate_file_view(path: str, size: tuple[int, int]):
     """Generate file manager view"""
-    directory = Directory(path)
+    directory = Directory(path, fmt)
     state = TabState(
         path,
-        Menu(directory, "", Basic.SELECTED, (1, 2), 1, count=lambda: len(directory)),
+        Menu(directory, "", "", Basic.SELECTED, (1, 2), 1, count=lambda: len(directory)), # type: ignore
         directory,  # type: ignore
     )
     panel = Panel(size[0] - 2, size[1], 1, 0, draw_tab, state)
@@ -51,21 +69,23 @@ class Root(Scene):
             panel.draw()
 
     def draw(self):
-        self._menu.draw(self._screen)
         self.update_panels()
+        self._menu.draw(self._screen)
         self.show_status()
 
     def init(self, stdscr: window):
         super().init(stdscr)
         root_panel, root_state = generate_file_view(getcwd(), (self.height, self.width))
         p1, s1 = generate_file_view("/", (self.height, self.width))
-        self._tabs = [root_panel, p1]
-        self._tabs_state = [root_state, s1]
+        p2, s2 = generate_file_view("/home", (self.height, self.width))
+        p3, s3 = generate_file_view("/dev", (self.height, self.width))
+        self._tabs = [root_panel, p1, p2, p3]
+        self._tabs_state = [root_state, s1, s2, s3]
         self._menu = HorizontalMenu(
             lambda index: (basename(self._tabs_state[index].cwd) or "/", lambda: None),
             "[",
-            "]",
-            Basic.SELECTED,
+            suffix="]",
+            selected_style=Basic.SELECTED,
         )
         self.tab_visibility_refresh()
 
@@ -103,15 +123,15 @@ class Root(Scene):
     @on_key(curses.KEY_RIGHT)
     def fetch(self):
         """fetch"""
-        _, cb = self._tabs_state[self._active].menu.fetch()
-        if not isinstance(cb, Forms):
-            cb()
+        entry = self._tabs_state[self._active].menu.fetch()
+        if callable(entry.content):
+            entry.content()
         return ReturnType.CONTINUE
 
 
 def init():
     """init"""
-    env = Theme(0, Basic())
+    env = Theme(0, basic)
     return Root(), env
 
 
