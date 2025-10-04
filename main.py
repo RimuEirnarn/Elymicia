@@ -12,6 +12,7 @@ from lymia.data import ReturnType, status
 from lymia.environment import Theme, Coloring
 from lymia.colors import ColorPair, color
 
+from props.ui.command import command
 from props.ui.tabs import TabState, draw_tab, CursorHistory
 from props.utils import Directory, FormatColor, DEFAULT as FMT_DFT
 
@@ -26,20 +27,22 @@ class Basic(Coloring):
     SOCK = ColorPair(color.GREEN, 0)
     BLOCK = ColorPair(color.YELLOW, 0)
 
+
 basic = Basic()
 
 fmt: FormatColor = {
-    'reg': FMT_DFT,
+    "reg": FMT_DFT,
     "block": ("", int(Basic.BLOCK)),
     "char": ("", int(Basic.DEVICE)),
     "directory": ("/", int(Basic.DIRECTORY)),
     "door": FMT_DFT,
     "fifo": FMT_DFT,
-    "link": ('@', int(Basic.SYMLINK)),
+    "link": ("@", int(Basic.SYMLINK)),
     "port": FMT_DFT,
     "sock": ("", int(Basic.SOCK)),
-    "whiteout": FMT_DFT
-} # type: ignore
+    "whiteout": FMT_DFT,
+}  # type: ignore
+
 
 def knock_knock(path: Path):
     """Return false if we aren't allowed"""
@@ -50,14 +53,15 @@ def knock_knock(path: Path):
         return False
     return True
 
+
 def generate_file_view(path: str, size: tuple[int, int]):
     """Generate file manager view"""
     directory = Directory(path, fmt)
     state = TabState(
         path,
-        Menu(directory, "", "", Basic.SELECTED, (1, 2), 1, count=lambda: len(directory)), # type: ignore
+        Menu(directory, "", "", Basic.SELECTED, (1, 2), 1, count=lambda: len(directory)),  # type: ignore
         directory,  # type: ignore,
-        []
+        [],
     )
     panel = Panel(size[0] - 2, size[1], 1, 0, draw_tab, state)
     return panel, state
@@ -82,6 +86,10 @@ class Root(Scene):
         self.update_panels()
         self._menu.draw(self._screen)
         self.show_status()
+
+    def deferred_op(self):
+        if command.buffer.editing:
+            command.buffer.reposition_cursor(self._screen, 1)
 
     def init(self, stdscr: window):
         super().init(stdscr)
@@ -114,6 +122,36 @@ class Root(Scene):
             index = self._active
         return self._tabs[index], self._tabs_state[index]
 
+    def keymap_override(self, key: int) -> ReturnType:
+        if command.buffer.editing:
+            ret = command.buffer.handle_edit(key)
+            if ret == ReturnType.REVERT_OVERRIDE:
+                return self.on_exitcmd()
+            else:
+                status.set(f':{command.buffer.displayed_value}')
+            return ret
+        return ReturnType.REVERT_OVERRIDE
+
+    def on_exitcmd(self):
+        """a"""
+        ret = command.call()
+        command.buffer.exit_edit()
+        command.buffer.value = ''
+        status.set("")
+        return ret
+
+    def select_menu_item(self):
+        """Select menu item"""
+        command.buffer.enter_edit()
+        self._override = True
+        status.set(":")
+        command.buffer.set_field_pos(self.height - 1)
+        return ReturnType.OVERRIDE
+
+    @on_key(":")
+    def enter_command(self):
+        """a"""
+        return self.select_menu_item()
 
     @on_key("q")
     def quit(self):
@@ -147,13 +185,14 @@ class Root(Scene):
             ps = state_active.cursor_history.pop()
         except IndexError:
             ps = CursorHistory(parent, 0)
+            if parent == "/" and str(path) == "/":
+                return ReturnType.CONTINUE
 
         state_active.cwd = str(ps.path)
         state_active.content.chdir(ps.path)
         state_active.menu.seek(ps.cursor)
         status.set(repr(state_active.cursor_history))
         return ReturnType.CONTINUE
-
 
     @on_key(curses.KEY_RIGHT)
     def fetch(self):
@@ -167,13 +206,19 @@ class Root(Scene):
         if not callable(entry.content):
             return ReturnType.CONTINUE
 
-        file: Path = entry.content() # type: ignore
+        file: Path = entry.content()  # type: ignore
+        try:
+            file.stat()
+        except PermissionError:
+            status.set(f"Access to: {file} failed, permission denied")
+            return ReturnType.CONTINUE
+
         if not file.is_dir() and not file.is_symlink():
             status.set(str(file))
             return ReturnType.CONTINUE
         if file.is_symlink():
             normalized = file.readlink()
-            if str(normalized)[0] != '/':
+            if str(normalized)[0] != "/":
                 normalized = Path(join(state_active.cwd, str(normalized)))
             if not normalized.is_dir():
                 status.set(str(file))
@@ -181,12 +226,12 @@ class Root(Scene):
             status.set(f"{file} -> {normalized}")
         if not knock_knock(file):
             return ReturnType.CONTINUE
+
         hist = CursorHistory(str(state_active.cwd), cursor)
         state_active.content.chdir(str(file))
         state_active.cwd = str(file)
         state_active.menu.reset_cursor()
         state_active.cursor_history.append(hist)
-        status.set(repr(state_active.cursor_history))
         return ReturnType.CONTINUE
 
 
