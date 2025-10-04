@@ -4,7 +4,7 @@ A simple CLI File Manager made with curses.
 
 ## Features
 
-It's file managers. What do you expect?
+It's a file manager. What do you expect?
 
 Also, it's currently only able to move around directories. Please wait until the app is fully implemented.
 
