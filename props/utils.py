@@ -2,14 +2,29 @@
 
 from os import listdir, stat
 from os.path import join
-from stat import S_ISCHR, S_ISDOOR, S_ISDIR, S_ISBLK, S_ISLNK, S_ISFIFO, S_ISPORT, S_ISREG, S_ISSOCK, S_ISWHT
+from pathlib import Path
+from stat import (
+    S_ISCHR,
+    S_ISDOOR,
+    S_ISDIR,
+    S_ISBLK,
+    S_ISLNK,
+    S_ISFIFO,
+    S_ISPORT,
+    S_ISREG,
+    S_ISSOCK,
+    S_ISWHT,
+)
 from typing import Any, TypedDict
 
-from lymia import status
 from lymia.menu import MenuEntry
 
-DEFAULT = ('', 0)
+DEFAULT = ("", 0)
+
+
 class FormatColor(TypedDict):
+    """File formats"""
+
     reg: tuple[str, int]
     link: tuple[str, int]
     directory: tuple[str, int]
@@ -23,28 +38,30 @@ class FormatColor(TypedDict):
 
 
 def get_fmt(fmt: FormatColor, path: str):
+    """Get format style"""
     st = stat(path, follow_symlinks=False).st_mode
     if S_ISCHR(st):
-        return fmt['char']
+        return fmt["char"]
     if S_ISDOOR(st):
-        return fmt['door']
+        return fmt["door"]
     if S_ISDIR(st):
-        return fmt['directory']
+        return fmt["directory"]
     if S_ISBLK(st):
-        return fmt['block']
+        return fmt["block"]
     if S_ISLNK(st):
-        return fmt['link']
+        return fmt["link"]
     if S_ISFIFO(st):
-        return fmt['link']
+        return fmt["link"]
     if S_ISPORT(st):
-        return fmt['port']
+        return fmt["port"]
     if S_ISREG(st):
-        return fmt['reg']
+        return fmt["reg"]
     if S_ISSOCK(st):
-        return fmt['sock']
+        return fmt["sock"]
     if S_ISWHT(st):
-        return fmt['whiteout']
+        return fmt["whiteout"]
     return DEFAULT
+
 
 def path_pointer(path: str, name: str, fmt: FormatColor):
     """Path pointer"""
@@ -52,7 +69,8 @@ def path_pointer(path: str, name: str, fmt: FormatColor):
     suffix, style = get_fmt(fmt, normalized)
     fname = name + suffix
 
-    return MenuEntry(fname, lambda: status.set(normalized), style=style)
+    return MenuEntry(fname, lambda: Path(normalized), style=style)
+
 
 def _lsdir(path: str, fmt: FormatColor):
     """lsdir"""
@@ -63,6 +81,7 @@ def _lsdir(path: str, fmt: FormatColor):
 
 class Directory:
     """lsdir"""
+
     def __init__(self, cwd: str, fmt: FormatColor) -> None:
         self._cwd = cwd
         self._c = _lsdir(cwd, fmt)
@@ -75,14 +94,23 @@ class Directory:
         """Refresh directory state"""
         self._c = _lsdir(self._cwd, self._fmt)
 
+    def chdir(self, path: str):
+        """Change directory"""
+        if path[0] != '/':
+            path = join(self._cwd, path)
+        self._cwd = path
+        self.refresh()
+
     def __call__(self, index: int):
-        return self._c[index] # type: ignore
+        return self._c[index]  # type: ignore
 
     def __iter__(self):
         return self._c.__iter__()
 
+
 class Mapper:
     """Map an object to whatever"""
+
     def __init__(self, content: Any) -> None:
         self._content = content
 

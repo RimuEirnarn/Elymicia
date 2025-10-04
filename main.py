@@ -3,15 +3,16 @@
 # pylint: disable=no-member,no-name-in-module
 
 import curses
-from os import getcwd
-from os.path import basename
+from os import getcwd, listdir
+from os.path import basename, join
 from curses import window
+from pathlib import Path
 from lymia import HorizontalMenu, Menu, Panel, Scene, on_key, run
-from lymia.data import ReturnType
+from lymia.data import ReturnType, status
 from lymia.environment import Theme, Coloring
 from lymia.colors import ColorPair, color
 
-from props.ui.tabs import TabState, draw_tab
+from props.ui.tabs import TabState, draw_tab, CursorHistory
 from props.utils import Directory, FormatColor, DEFAULT as FMT_DFT
 
 
@@ -40,6 +41,14 @@ fmt: FormatColor = {
     "whiteout": FMT_DFT
 } # type: ignore
 
+def knock_knock(path: Path):
+    """Return false if we aren't allowed"""
+    try:
+        listdir(path)
+    except PermissionError:
+        status.set("Cannot open: Permission Error")
+        return False
+    return True
 
 def generate_file_view(path: str, size: tuple[int, int]):
     """Generate file manager view"""
@@ -47,7 +56,8 @@ def generate_file_view(path: str, size: tuple[int, int]):
     state = TabState(
         path,
         Menu(directory, "", "", Basic.SELECTED, (1, 2), 1, count=lambda: len(directory)), # type: ignore
-        directory,  # type: ignore
+        directory,  # type: ignore,
+        []
     )
     panel = Panel(size[0] - 2, size[1], 1, 0, draw_tab, state)
     return panel, state
@@ -99,6 +109,12 @@ class Root(Scene):
                 tab.show()
                 self.register_keymap(self._tabs_state[self._active].menu)
 
+    def _fetch(self, index: int | None = None) -> tuple[Panel, TabState]:
+        if index is None:
+            index = self._active
+        return self._tabs[index], self._tabs_state[index]
+
+
     @on_key("q")
     def quit(self):
         """quit"""
@@ -120,12 +136,57 @@ class Root(Scene):
         self.tab_visibility_refresh()
         return ReturnType.CONTINUE
 
+    @on_key(curses.KEY_LEFT)
+    def back(self):
+        """back"""
+        _, state_active = self._fetch()
+        path = Path(state_active.cwd)
+        parent = str(path.parent)
+
+        try:
+            ps = state_active.cursor_history.pop()
+        except IndexError:
+            ps = CursorHistory(parent, 0)
+
+        state_active.cwd = str(ps.path)
+        state_active.content.chdir(ps.path)
+        state_active.menu.seek(ps.cursor)
+        status.set(repr(state_active.cursor_history))
+        return ReturnType.CONTINUE
+
+
     @on_key(curses.KEY_RIGHT)
     def fetch(self):
         """fetch"""
-        entry = self._tabs_state[self._active].menu.fetch()
-        if callable(entry.content):
-            entry.content()
+        _, state_active = self._fetch()
+        try:
+            entry = state_active.menu.fetch()
+            cursor = state_active.menu.cursor
+        except IndexError:
+            return ReturnType.CONTINUE
+        if not callable(entry.content):
+            return ReturnType.CONTINUE
+
+        file: Path = entry.content() # type: ignore
+        if not file.is_dir() and not file.is_symlink():
+            status.set(str(file))
+            return ReturnType.CONTINUE
+        if file.is_symlink():
+            normalized = file.readlink()
+            if str(normalized)[0] != '/':
+                normalized = Path(join(state_active.cwd, str(normalized)))
+            if not normalized.is_dir():
+                status.set(str(file))
+                return ReturnType.CONTINUE
+            status.set(f"{file} -> {normalized}")
+        if not knock_knock(file):
+            return ReturnType.CONTINUE
+        hist = CursorHistory(str(state_active.cwd), cursor)
+        state_active.content.chdir(str(file))
+        state_active.cwd = str(file)
+        state_active.menu.reset_cursor()
+        state_active.cursor_history.append(hist)
+        status.set(repr(state_active.cursor_history))
         return ReturnType.CONTINUE
 
 
