@@ -13,7 +13,7 @@ Also, it's currently only able to move around directories. Please wait until the
 To install, follow this guide:
 
 ```sh
-git clone https://RimuEirnarn/Elymicia
+git clone https://github.com/RimuEirnarn/Elymicia
 cd Elymicia
 python -m venv .venv
 pip install -r ./requirements.txt
