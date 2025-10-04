@@ -24,18 +24,18 @@ To quit, type `:q`. To navigate, use arrow keys.
 
 ## Roadmap
 
-[x]: Moveable File UI
-[x]: Tabs for multiple File UIs
-[x]: Commands (Activate via `:`), see [this part](#commands)
-[ ]: File Viewer
-[ ]: File opener
-[ ]: Copy
-[ ]: Move
-[ ]: Delete
-[ ]: Archive
-[ ]: Extract
-[ ]: Find
-[ ]: Sort
+- [x] Moveable File UI
+- [x] Tabs for multiple File UIs
+- [x] Commands (Activate via `:`), see [this part](#commands)
+- [ ] File Viewer
+- [ ] File opener
+- [ ] Copy
+- [ ] Move
+- [ ] Delete
+- [ ] Archive
+- [ ] Extract
+- [ ] Find
++ [ ] Sort
 
 ### Commands
 
