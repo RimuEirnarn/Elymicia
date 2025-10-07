@@ -17,6 +17,17 @@ class WindowState:
         self._winsize = (0, 0)
         self._trig: list[Callable[[int], None]] = []
         self._active = 0
+        self._popup: Panel | None = None
+
+    @property
+    def popup(self):
+        """Popup panel"""
+        return self._popup
+
+    @popup.setter
+    def popup(self, panel: Panel):
+        """Popup panel"""
+        self._popup = panel
 
     @property
     def winsize(self):

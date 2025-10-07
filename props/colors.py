@@ -6,11 +6,11 @@ class Basic(Coloring):
     """Basic"""
 
     SELECTED = ColorPair(color.BLACK, color.YELLOW)
-    DIRECTORY = ColorPair(color.BLUE, 0)
-    SYMLINK = ColorPair(color.CYAN, 0)
-    DEVICE = ColorPair(color.YELLOW, 0)
-    SOCK = ColorPair(color.GREEN, 0)
-    BLOCK = ColorPair(color.YELLOW, 0)
+    DIRECTORY = ColorPair(color.BLUE, -1)
+    SYMLINK = ColorPair(color.CYAN, -1)
+    DEVICE = ColorPair(color.YELLOW, color.BLACK)
+    SOCK = ColorPair(color.GREEN, -1)
+    BLOCK = ColorPair(color.YELLOW, -1)
 
 
 basic = Basic()

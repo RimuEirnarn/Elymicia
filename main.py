@@ -20,6 +20,8 @@ from props.ui.tabs import CursorHistory
 class Root(Scene):
     """Root scene"""
 
+    use_default_color: bool = True
+
     def __init__(self) -> None:
         self._state = WindowState()
         self._menu: HorizontalMenu
@@ -37,6 +39,8 @@ class Root(Scene):
 
     def draw(self):
         self.update_panels()
+        if self._state.popup:
+            self._state.popup.draw()
         self._menu.draw(self._screen)
         self.show_status()
 

@@ -6,6 +6,7 @@ from subprocess import call
 from typing import Callable
 from lymia.data import ReturnType, status
 from lymia.forms import Text
+from lymia.panel import Panel
 from lymia.utils import hide_system
 from props.files import change_dir
 from props.state import WindowState
@@ -17,14 +18,44 @@ class Command:
         self._cmd: dict[str, Callable[[curses.window, WindowState, list[str]], ReturnType]] = {}
         self._screen: curses.window
         self._state: WindowState
+        self._helps: dict[str, str] = {}
+        self._alias: dict[str, list[str]] = {}
 
-    def add_command(self, *value: str):
+    def add_command(self, *value: str, help: str = ""): # pylint: disable=redefined-builtin
         """Add command"""
         def inner(fn: Callable[[curses.window, WindowState, list[str]], ReturnType]):
+            alias = ""
             for v in value:
+                if self._cmd.get(v, None):
+                    if fn != self._cmd[v]:
+                        for aval in self._alias.copy().values():
+                            if not v in aval:
+                                continue
+                            aval.remove(v)
                 self._cmd[v] = fn
+                if not self._alias.get(v, None):
+                    alias = v
+                    self._alias[alias] = []
+                    self._helps[alias] = help
+                else:
+                    self._alias[alias].append(v)
             return fn
         return inner
+
+    @property
+    def alias(self):
+        """Aliases"""
+        return self._alias.copy()
+
+    @property
+    def helplist(self):
+        """Help list"""
+        return self._helps.copy()
+
+    @property
+    def cmds(self):
+        """Commands"""
+        return self._cmd.copy()
 
     def use_screen(self, screen: curses.window):
         """Give this class a screen!"""
@@ -54,11 +85,25 @@ class Command:
                 return ReturnType.CONTINUE
         return fn(self._screen, self._state, args[1:])
 
+def show_help(screen: curses.window, _):
+    screen.box()
+    for index, cmd in enumerate(command.cmds):
+        hs = command.helplist[cmd]
+        alias = command.alias.get(cmd, None)
+        alias_str = ""
+        if alias:
+            alias_str = f" (Found alias: {' ,'.join(alias)}"
+        screen.addstr(index + 1, 1, f"[{cmd}] -> {hs}{alias_str}")
+
+
 command = Command()
 
 @command.add_command("q")
-def q(*_):
+def q(_, state: WindowState, *__):
     """Quit"""
+    if state.popup:
+        state.popup = None # type: ignore
+        return ReturnType.CONTINUE
     return ReturnType.EXIT
 
 @command.add_command("term", "terminal")
@@ -121,3 +166,15 @@ def cd(_, state: WindowState, args: list[str]):
     tabstate = state.fetch()[1]
     ret = change_dir(tabstate, path, tabstate.menu.cursor)
     return ret
+
+@command.add_command('help', help="Opens up help panel")
+def help_(screen: curses.window, state: WindowState, _):
+    maxy, maxx = screen.getmaxyx()
+    panel = Panel(maxy - 2, maxx, 1, 0, show_help)
+    state.popup = panel
+    return ReturnType.CONTINUE
+
+@command.add_command('close', help="Close any popup panel")
+def closepanel(_, state: WindowState, __):
+    state.popup = None # type: ignore
+    return ReturnType.CONTINUE
