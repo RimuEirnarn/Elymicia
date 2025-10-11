@@ -1,3 +1,4 @@
+"""VIM-like command"""
 import curses
 from pathlib import Path
 from shlex import split
@@ -24,21 +25,14 @@ class Command:
     def add_command(self, *value: str, help: str = ""): # pylint: disable=redefined-builtin
         """Add command"""
         def inner(fn: Callable[[curses.window, WindowState, list[str]], ReturnType]):
-            alias = ""
-            for v in value:
-                if self._cmd.get(v, None):
-                    if fn != self._cmd[v]:
-                        for aval in self._alias.copy().values():
-                            if not v in aval:
-                                continue
-                            aval.remove(v)
+            alias = value[0]
+            self._alias[alias] = []
+            self._helps[alias] = help or fn.__doc__ or ""
+            self._cmd[alias] = fn
+
+            for v in value[1:]:
+                self._alias[alias].append(v)
                 self._cmd[v] = fn
-                if not self._alias.get(v, None):
-                    alias = v
-                    self._alias[alias] = []
-                    self._helps[alias] = help
-                else:
-                    self._alias[alias].append(v)
             return fn
         return inner
 
@@ -75,6 +69,7 @@ class Command:
         args = split(self._buffer.value)
         base = args[0] if len(args) >= 1 else ''
         fn = self._cmd.get(base, None)
+
         if not base:
             return ReturnType.CONTINUE
         if not fn:
@@ -86,13 +81,15 @@ class Command:
         return fn(self._screen, self._state, args[1:])
 
 def show_help(screen: curses.window, _):
+    """Show help"""
     screen.box()
-    for index, cmd in enumerate(command.cmds):
-        hs = command.helplist[cmd]
+    for index, (cmd, hs) in enumerate(command.helplist.items()):
         alias = command.alias.get(cmd, None)
         alias_str = ""
         if alias:
-            alias_str = f" (Found alias: {' ,'.join(alias)}"
+            alias_str = f" (alias: {' ,'.join(alias)})"
+        if not hs:
+            hs = "(undocumented)"
         screen.addstr(index + 1, 1, f"[{cmd}] -> {hs}{alias_str}")
 
 
@@ -102,7 +99,7 @@ command = Command()
 def q(_, state: WindowState, *__):
     """Quit"""
     if state.popup:
-        state.popup = None # type: ignore
+        state.reset_popup()
         return ReturnType.CONTINUE
     return ReturnType.EXIT
 
@@ -143,21 +140,15 @@ def close_tab(_, state: WindowState, args: list[str]):
         return ReturnType.EXIT
     return ReturnType.CONTINUE
 
-@command.add_command('t')
-def t(_, s: WindowState, *__):
-    """a"""
-    status.set(f"Tabs: {len(s.tab_states)}:{len(s.panels)}")
-    return ReturnType.CONTINUE
-
 @command.add_command('pwd')
 def pwd(_, state: WindowState, *__):
-    """pwd"""
+    """Show current working directory"""
     status.set(f"{state.fetch()[1].cwd}")
     return ReturnType.CONTINUE
 
 @command.add_command('cd')
 def cd(_, state: WindowState, args: list[str]):
-    """change dir"""
+    """Change current directory"""
     try:
         path = Path(args[0]).expanduser().absolute()
     except IndexError:
@@ -169,6 +160,7 @@ def cd(_, state: WindowState, args: list[str]):
 
 @command.add_command('help', help="Opens up help panel")
 def help_(screen: curses.window, state: WindowState, _):
+    """Opens help popup"""
     maxy, maxx = screen.getmaxyx()
     panel = Panel(maxy - 2, maxx, 1, 0, show_help)
     state.popup = panel
@@ -176,5 +168,11 @@ def help_(screen: curses.window, state: WindowState, _):
 
 @command.add_command('close', help="Close any popup panel")
 def closepanel(_, state: WindowState, __):
-    state.popup = None # type: ignore
+    """Close a popup panel"""
+    state.reset_popup()
     return ReturnType.CONTINUE
+
+@command.add_command('q!', help="Auto quit")
+def quit0(*_):
+    """Force quit"""
+    return ReturnType.EXIT

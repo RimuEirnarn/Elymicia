@@ -70,6 +70,7 @@ class Root(Scene):
 
     def tab_visibility_refresh(self):
         """Refresh tab visibility"""
+        self._state.reset_popup()
         for index, tab in enumerate(self._state.panels):
             if index != self._state.active:
                 tab.hide()

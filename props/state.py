@@ -29,6 +29,10 @@ class WindowState:
         """Popup panel"""
         self._popup = panel
 
+    def reset_popup(self):
+        """Reset popup to None"""
+        self._popup = None
+
     @property
     def winsize(self):
         """Window size"""
