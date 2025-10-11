@@ -9,7 +9,7 @@ from lymia.data import ReturnType, status
 from lymia.forms import Text
 from lymia.panel import Panel
 from lymia.utils import hide_system
-from props.files import change_dir
+from props.files import change_dir, get_editor, open_file as fs_open
 from props.state import WindowState
 
 class Command:
@@ -92,6 +92,12 @@ def show_help(screen: curses.window, _):
             hs = "(undocumented)"
         screen.addstr(index + 1, 1, f"[{cmd}] -> {hs}{alias_str}")
 
+def show_config(screen: curses.window, state: dict[str, str]):
+    """Show config"""
+    screen.box()
+    for index, (key, value) in enumerate(state.items()):
+        screen.addstr(index + 1, 1, f"{key} = {value!r}")
+
 
 command = Command()
 
@@ -163,7 +169,7 @@ def help_(screen: curses.window, state: WindowState, _):
     """Opens help popup"""
     maxy, maxx = screen.getmaxyx()
     panel = Panel(maxy - 2, maxx, 1, 0, show_help)
-    state.popup = panel
+    state.popup.append(panel)
     return ReturnType.CONTINUE
 
 @command.add_command('close', help="Close any popup panel")
@@ -176,3 +182,43 @@ def closepanel(_, state: WindowState, __):
 def quit0(*_):
     """Force quit"""
     return ReturnType.EXIT
+
+@command.add_command("open")
+def open_file(screen: curses.window, state: WindowState, args):
+    """Open a file"""
+    try:
+        file = args[0]
+    except IndexError:
+        status.set("Please provide filename")
+        return ReturnType.ERR
+    try:
+        editor = get_editor(state)
+    except ValueError:
+        status.set("Please provide editor through environment variables")
+        return ReturnType.ERR
+    fs_open(screen, editor, file)
+    return ReturnType.CONTINUE
+
+@command.add_command("set")
+def set_config(_, state: WindowState, args: list[str]):
+    """Set a key based on value"""
+    try:
+        val = args[0]
+    except IndexError:
+        status.set("Provide an argument, i.e: set key=value")
+        return ReturnType.ERR
+    try:
+        var, v = val.split('=', 1)
+    except ValueError:
+        status.set(f"Invalid syntax: {val}")
+        return ReturnType.ERR
+    state.settings[var] = v
+    return ReturnType.CONTINUE
+
+@command.add_command("config")
+def get_config(screen: curses.window, state: WindowState, _):
+    """Opens config viewer"""
+    maxy, maxx = screen.getmaxyx()
+    panel = Panel(maxy - 2, maxx, 1, 0, show_config, state.settings)
+    state.popup.append(panel)
+    return ReturnType.CONTINUE

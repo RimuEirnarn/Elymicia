@@ -3,6 +3,7 @@
 # pylint: disable=no-member,no-name-in-module
 
 import curses
+from json import dumps, loads
 from os import getcwd
 from curses import window
 from pathlib import Path
@@ -10,12 +11,17 @@ from lymia import HorizontalMenu, Scene, on_key, run
 from lymia.data import ReturnType, status
 from lymia.environment import Theme
 
-from props.files import entry_change_dir
+from props.files import entry_file_manager
 from props.state import WindowState
 from props.colors import basic, Basic
 from props.ui.command import command
 from props.ui.tabs import CursorHistory
 
+CONFIG_DIR = Path("~/.rimueirnarn.elymicia").expanduser().resolve()
+CONFIG_FILE = CONFIG_DIR / "config.json"
+if not CONFIG_DIR.exists():
+    CONFIG_DIR.mkdir()
+    CONFIG_FILE.touch()
 
 class Root(Scene):
     """Root scene"""
@@ -26,6 +32,10 @@ class Root(Scene):
         self._state = WindowState()
         self._menu: HorizontalMenu
         self._active_cursor = 0
+        config = loads(CONFIG_FILE.read_text() or '{}')
+        if not isinstance(config, dict):
+            config = {}
+        self._state.settings.update(config)
         super().__init__()
 
     @property
@@ -40,7 +50,10 @@ class Root(Scene):
     def draw(self):
         self.update_panels()
         if self._state.popup:
-            self._state.popup.draw()
+            for popup in self._state.popup:
+                if not popup.visible:
+                    continue
+                popup.draw()
         self._menu.draw(self._screen)
         self.show_status()
 
@@ -58,7 +71,7 @@ class Root(Scene):
         self._state.start_files_view("/home", self.size)
         self._state.start_files_view("/dev", self.size)
         self._menu = HorizontalMenu(
-        self._state.tab_views,
+            self._state.tab_views,
             "[",
             suffix="]",
             selected_style=Basic.SELECTED,
@@ -85,16 +98,23 @@ class Root(Scene):
             if ret == ReturnType.REVERT_OVERRIDE:
                 self._override = False
                 return self.on_exitcmd()
-            status.set(f':{command.buffer.displayed_value}')
+            status.set(f":{command.buffer.displayed_value}")
             return ret
         return ReturnType.REVERT_OVERRIDE
+
+    def on_unmount(self):
+        s = self._state.settings
+        if s == loads(CONFIG_FILE.read_text() or '{}'):
+            return
+        data = dumps(s, indent=2)
+        CONFIG_FILE.write_text(data)
 
     def on_exitcmd(self):
         """a"""
         status.set("")
         ret = command.call()
         command.buffer.exit_edit()
-        command.buffer.value = '' # type: ignore
+        command.buffer.value = ""  # type: ignore
         return ret
 
     def select_menu_item(self):
@@ -114,7 +134,7 @@ class Root(Scene):
     def switch(self):
         """switch"""
         cursor = self._menu._cursor  # pylint: disable=protected-access
-        if self._state.switch_files_view(cursor) == 'first':
+        if self._state.switch_files_view(cursor) == "first":
             self._menu._cursor = 0  # pylint: disable=protected-access
             self.tab_visibility_refresh()
             return ReturnType.CONTINUE
@@ -150,7 +170,11 @@ class Root(Scene):
     @on_key(curses.KEY_RIGHT)
     def fetch(self):
         """fetch"""
-        return entry_change_dir(self._state.fetch()[1])
+        try:
+            return entry_file_manager(self._screen, self._state.fetch()[1], self._state)
+        except ValueError as exc:
+            status.set(f"{exc!s}")
+            return ReturnType.ERR
 
 
 def init():

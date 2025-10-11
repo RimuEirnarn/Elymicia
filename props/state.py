@@ -1,3 +1,4 @@
+"""Global Window State"""
 from posixpath import basename
 from typing import Callable
 from lymia.data import status
@@ -17,21 +18,22 @@ class WindowState:
         self._winsize = (0, 0)
         self._trig: list[Callable[[int], None]] = []
         self._active = 0
-        self._popup: Panel | None = None
+        self._popup: list[Panel] = []
+        self._kv: dict[str, str] = {}
+
+    @property
+    def settings(self):
+        """Returns app setting (volatile!)"""
+        return self._kv
 
     @property
     def popup(self):
         """Popup panel"""
         return self._popup
 
-    @popup.setter
-    def popup(self, panel: Panel):
-        """Popup panel"""
-        self._popup = panel
-
     def reset_popup(self):
         """Reset popup to None"""
-        self._popup = None
+        self._popup.clear()
 
     @property
     def winsize(self):
