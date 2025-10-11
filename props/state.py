@@ -128,10 +128,18 @@ class WindowState:
         self._tab_states.pop(pop_index)
         self.active = index
 
-    def switch_files_view(self, index: int):
+    def move_right(self, index: int):
         """Switch file view"""
         if index >= len(self.tab_states) - 1:
             self._active = 0
             return 'first'
         self._active += 1
         return 'right'
+
+    def move_left(self, index: int):
+        """Switch file view"""
+        if index <= 0:
+            self._active = len(self._panels) - 1
+            return 'last'
+        self._active -= 1
+        return 'left'

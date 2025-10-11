@@ -23,6 +23,8 @@ if not CONFIG_DIR.exists():
     CONFIG_DIR.mkdir()
     CONFIG_FILE.touch()
 
+SHIFT_TAB = 353
+
 class Root(Scene):
     """Root scene"""
 
@@ -130,11 +132,23 @@ class Root(Scene):
         """a"""
         return self.select_menu_item()
 
-    @on_key("\t")
-    def switch(self):
+    @on_key(SHIFT_TAB)
+    def switch_left(self):
         """switch"""
         cursor = self._menu._cursor  # pylint: disable=protected-access
-        if self._state.switch_files_view(cursor) == "first":
+        if self._state.move_left(cursor) == "last":
+            self._menu._cursor = len(self._state.panels) - 1  # pylint: disable=protected-access
+            self.tab_visibility_refresh()
+            return ReturnType.CONTINUE
+        self._menu.move_up()
+        self.tab_visibility_refresh()
+        return ReturnType.CONTINUE
+
+    @on_key("\t")
+    def switch_right(self):
+        """switch"""
+        cursor = self._menu._cursor  # pylint: disable=protected-access
+        if self._state.move_right(cursor) == "first":
             self._menu._cursor = 0  # pylint: disable=protected-access
             self.tab_visibility_refresh()
             return ReturnType.CONTINUE
