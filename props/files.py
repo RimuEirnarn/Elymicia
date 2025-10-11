@@ -44,7 +44,7 @@ def entry_file_manager(screen: curses.window, state: TabState, wstate: WindowSta
     except IndexError:
         return ReturnType.CONTINUE
 
-    path: Path = entry.content()
+    path: Path = entry.content().expanduser()
     try:
         path.stat()
     except PermissionError:

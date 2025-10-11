@@ -1,4 +1,5 @@
 """Global Window State"""
+from pathlib import Path
 from posixpath import basename
 from typing import Callable
 from lymia.data import status
@@ -96,6 +97,7 @@ class WindowState:
         """Generate file manager view"""
         if size == (-1, -1):
             size = self.winsize
+        path = str(Path(path).expanduser())
         try:
             directory = Directory(path, fmt)
         except (FileNotFoundError, PermissionError) as exc:
